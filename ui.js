@@ -158,7 +158,7 @@ document.addEventListener('keydown', function (e) {
      disagree about what a phone is, the layout reserves space for one deck and
      paints another. */
   var PHONE_PORTRAIT = '(max-width: 560px)';
-  var PHONE_LANDSCAPE = '(orientation: landscape) and (max-height: 500px) and (min-width: 740px)';
+  var PHONE_LANDSCAPE = '(orientation: landscape) and (max-height: 500px) and (min-width: 740px) and (max-width: 1023px)';
   function phoneMode() {
     if (window.matchMedia(PHONE_PORTRAIT).matches) return 'portrait';
     if (window.matchMedia(PHONE_LANDSCAPE).matches) return 'landscape';
@@ -178,6 +178,48 @@ document.addEventListener('keydown', function (e) {
   var FLAT_DRAWER = 1100;
   var root = document.documentElement, queued = false;
 
+  /* ------------------------------------------------------- K1 — the keyboard ---
+
+     Everything below budgets against `window.innerHeight`, and in a `standalone`
+     home-screen app that is a number the software keyboard changes: the layout
+     viewport shrinks by the keyboard's height and `resize` fires, so the fit
+     re-measures and hands the card whatever is left above the keys. Measured:
+     an 11" iPad in landscape took `--grid-max-h` from 429px to 120px and the
+     grid's overflow from 52px to 390px; a 13" took `--cell-h` from 62px to 44px
+     and moved the ninth row 153px up. On dismiss all of it snapped back.
+
+     None of that is the fit being wrong. It is the fit being asked a question
+     nobody wanted answered: the card was already laid out for the screen when the
+     keyboard arrived, and the right thing for it to do is *nothing*. So the height
+     budget is held for as long as a field has focus, and re-measured once on blur.
+
+     Focus is the signal rather than `visualViewport`, and deliberately. On iOS the
+     visual viewport shrinks in a Safari tab but the layout viewport shrinks in a
+     standalone app — so `innerHeight - visualViewport.height` is ~350 in one and ~0
+     in the other, and it reads zero in exactly the case that does the damage. A
+     text field having focus means a keyboard on every touch device there is.
+
+     It over-reads in one place and harmlessly: the position pad's readout is a
+     focused `readOnly` input, which raises no keyboard on iOS, so the fit is held
+     while the pad is open. Nothing changes the card's height in that window, and
+     the blur below picks it up either way — so the narrower test is not worth the
+     second thing to be wrong about.
+
+     Width is the one thing still honoured while held: a keyboard never changes it
+     and a rotation always does, so turning the iPad with the sheet open still
+     re-lays the card out rather than waiting for a blur. */
+  var NON_TEXT = /^(button|checkbox|color|file|hidden|image|radio|range|reset|submit)$/;
+  function typing() {
+    var el = document.activeElement;
+    if (!el || el === document.body || el === root) return false;
+    if (el.isContentEditable || el.tagName === 'TEXTAREA') return true;
+    return el.tagName === 'INPUT' && !NON_TEXT.test(el.type || 'text');
+  }
+  /* The last height measured with no keyboard over it, and the width it went with.
+     `restH` is what tells the docked deck how far it has been lifted — see
+     `--kb-shift` below. */
+  var restH = window.innerHeight, restW = window.innerWidth;
+
   function boxH(sel) {
     var e = document.querySelector('.tab-content.active ' + sel);
     return e ? e.getBoundingClientRect().height : 0;
@@ -185,6 +227,32 @@ document.addEventListener('keydown', function (e) {
 
   function fit() {
     queued = false;
+
+    /* K1. A keyboard is up and the screen is the same width it was, so the card
+       stays exactly as it was laid out before it opened — no re-measure, and an
+       early return before anything is written.
+
+       One thing does still have to be written, and it is the reason this is not
+       simply `return`. The docked deck is `position: fixed; bottom: 0`, which
+       anchors it to the *layout* viewport — the thing that just shrank — so it
+       rides up the screen by the keyboard's full height on its own, with no help
+       from the fit at all: 378px on a 13" iPad, measured. `--kb-shift` is exactly
+       how much was lost, and the stylesheet subtracts it back off `bottom` so the
+       deck holds still with everything else. It goes behind the keyboard, which is
+       where a bottom-docked bar belongs while one is open; nothing is reachable
+       there to be denied.
+
+       `restH` is not updated here — the height under a keyboard is not a rest
+       height, and taking it as one would leave the deck re-anchored to the keys
+       after they close. */
+    if (typing() && window.innerWidth === restW) {
+      root.style.setProperty('--kb-shift', Math.max(0, restH - window.innerHeight) + 'px');
+      return;
+    }
+    restW = window.innerWidth;
+    restH = window.innerHeight;
+    root.style.setProperty('--kb-shift', '0px');
+
     /* Reserve the deck's resting height only. The More-plays drawer
        expands over the card; it must not push 400px of padding in.
 
@@ -342,10 +410,22 @@ document.addEventListener('keydown', function (e) {
   document.addEventListener('click', function (e) {
     if (e.target.closest && e.target.closest('[data-act], [data-ui-act]')) refit();
   });
-  /* Naming a substitute is what reveals his row, and it happens under the
-     scorer's fingers rather than on a press. Coalesced to one measurement
-     per frame, so a whole name costs one. */
-  document.addEventListener('input', refit);
+  /* This was `document.addEventListener('input', refit)`, and its reason was that
+     naming a substitute reveals his row — which used to happen a letter at a time,
+     in the 13px cell, under the scorer's fingers rather than on a press.
+
+     F46 moved that naming into a sheet, so the row now appears on one press of Add
+     and the click listener above already covers it. What the input listener was
+     still doing was re-measuring the whole card once per character typed anywhere
+     in the app — the Notes box, the linescore, the paste textarea — and, since a
+     keyboard is up for every one of those, doing it against a viewport the keyboard
+     had shrunk. It was the engine under the substitute jumping rather than a
+     bystander to it. Gone: nothing is left that wants a fit per keystroke.
+
+     Blur is what wants one instead. The keyboard closing gives the height back, and
+     `fit()` has been holding since it opened, so this is the call that picks the
+     card back up. It costs one measurement per field left, against one per letter. */
+  document.addEventListener('focusout', refit);
   /* Laid flat the deck's height is reserved, so folding it away hands ~114px back to
      the batting rows — but the click above measures on the next frame, 200ms before
      the padding has finished animating, and would bake in a stale height. Measure

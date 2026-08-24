@@ -9604,6 +9604,61 @@
     eq('the focused cell is the selected one', selectedCell, other);
   });
 
+  /* ---- K1: a tap must not scroll the card -----------------------------------
+
+     `--grid-max-h` makes `.grid-wrap` a scroll container for most of the card's
+     life, and the focusing steps scroll a field into view before they dispatch
+     `focusin` — measured in a browser, one focus on the ninth batter's name field
+     took a 400px-overflow grid from 0 to its end. A tap lands on a field already
+     on screen, so that travel is pure loss and is put back; Tab can genuinely
+     reach a field off the bottom, so its scroll is left alone.
+
+     jsdom lays nothing out, so the box has to be told it overflows. `scrollTop`
+     is a real settable property either way, which is the thing under test. */
+  function scrollBox() {
+    const wrap = document.querySelector('.tab-content.active .grid-wrap')
+              || document.querySelector('.grid-wrap');
+    Object.defineProperty(wrap, 'scrollHeight', { value: 900, configurable: true });
+    Object.defineProperty(wrap, 'clientHeight', { value: 500, configurable: true });
+    wrap.scrollTop = 0;
+    return wrap;
+  }
+  // What the browser does between the pointer landing and `focusin` firing.
+  function tapFocus(wrap, field, scrolledTo) {
+    document.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
+    wrap.scrollTop = scrolledTo;
+    field.dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
+  }
+
+  const nameField = (team, p) =>
+    document.querySelector(`input[data-field="name"][data-team="${team}"][data-p="${p}"]`);
+
+  test('a tap on a field puts the card back where it was', () => {
+    const wrap = scrollBox();
+    const field = nameField('visiting', 24);
+    tapFocus(wrap, field, 400);
+    eq('the grid is back at the top', wrap.scrollTop, 0);
+  });
+
+  test('a tap holds the scroll it was made at, not the top of the box', () => {
+    const wrap = scrollBox();
+    wrap.scrollTop = 120;                       // the scorer had scrolled down
+    tapFocus(wrap, nameField('visiting', 24), 400);
+    eq('the grid is back at 120, not 0', wrap.scrollTop, 120);
+  });
+
+  test('a focus with no pointer behind it still scrolls, so Tab can reach row nine', () => {
+    const wrap = scrollBox();
+    // The keydown is what says this is Tab and not a finger — and it is load-bearing
+    // rather than scene-setting: a tap a moment earlier is still inside the 700ms
+    // window, and without the key ending its claim this focus would be put back.
+    document.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }));
+    wrap.scrollTop = 400;
+    nameField('visiting', 24).dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
+    eq('the scroll-into-view survives', wrap.scrollTop, 400);
+  });
+
   /* ---- I7: read the cell back ---------------------------------------------
 
      The readout renders from `cellOutcome`, which is what the screen-reader

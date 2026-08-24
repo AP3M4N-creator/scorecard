@@ -608,7 +608,7 @@ details.info-details > summary:hover { color: var(--navy); }
 /* Sharing the bar's row. The bar shrinks to its controls, which parks "Show
    sub rows" against them rather than at the far edge — its `margin-left: auto`
    has no slack left to push into — and the echo takes what is left. */
-@media (min-width: 835px) and (min-height: 501px) {
+@media (min-width: 1024px), (min-width: 835px) and (min-height: 501px) {
   [data-mode="beginner"] .sec-row { display: flex; align-items: center; gap: 12px; }
   [data-mode="beginner"] .sec-row > .sec-bar { flex: 0 1 auto; }
   [data-mode="beginner"] .sec-row > .play-echo { flex: 1 1 0; text-align: right; }
@@ -2082,7 +2082,7 @@ details.info-details > summary:hover { color: var(--navy); }
   #live-stats > .live-cell:first-child { border-left: none; padding-left: 0; }
   /* Keep entry in reach: dock the quick bar to the bottom edge */
   .tab-content.active .quick-bar {
-    position: fixed; left: 0; right: 0; bottom: 0; z-index: var(--z-deck-docked);
+    position: fixed; left: 0; right: 0; bottom: calc(0px - var(--kb-shift, 0px)); z-index: var(--z-deck-docked);
     flex-direction: column-reverse; background: var(--cream);
     border-top: 1px solid var(--text); padding: 0 12px;
     box-shadow: 0 -6px 20px rgba(45,43,43,0.16);
@@ -2224,9 +2224,21 @@ details.info-details > summary::before { color: var(--rb-red); }
 .sec-btn:hover, .qbg-tab:hover { border-color: var(--rb-blue); color: var(--rb-blue); }
 .sec-btn.active, .qbg-tab.active { background: var(--rb-red); border-color: var(--rb-red); color: var(--rb-white); }
 
-/* ---------- Entry deck, docked at every size ---------- */
+/* ---------- Entry deck, docked at every size ----------
+
+   `bottom` is not 0, and `--kb-shift` is why (K1). `position: fixed` anchors to the
+   layout viewport, and a standalone home-screen app shrinks that viewport when the
+   keyboard opens — so a deck pinned at 0 rides up the screen by the keyboard's whole
+   height on its own, 378px on a 13" iPad, while the card behind it holds still. That
+   is the one thing left moving once `fit()` stops re-measuring.
+
+   `fit()` writes how much height was lost and this subtracts it straight back, which
+   puts the deck where it was: behind the keyboard. Deliberate — a bottom-docked bar
+   under an open keyboard cannot be tapped wherever it is drawn, so lifting it buys
+   nothing and costs the stillness. `0px` when there is no keyboard, and the `, 0px`
+   fallback covers the frame before `fit()` has run at all. */
 .tab-content.active .quick-bar {
-  position: fixed; left: 0; right: 0; bottom: 0; z-index: var(--z-deck-docked);
+  position: fixed; left: 0; right: 0; bottom: calc(0px - var(--kb-shift, 0px)); z-index: var(--z-deck-docked);
   flex-direction: column-reverse;
   background: rgba(255,255,255,0.97); backdrop-filter: blur(12px);
   border-top: 3px solid var(--rb-red); padding: 0 20px;
@@ -2541,12 +2553,34 @@ details.info-details > summary:hover { background: rgba(255,255,255,0.16); borde
    on a 390px-tall window, including a sticky `.deck-strip` and a caption set to
    `font-size: 0`. Neither was written with 390px of height in mind.
 
-   `min-height: 501px` is the exact complement, not an approximation of one: the
+   `min-height: 501px` was the exact complement, not an approximation of one: the
    phone block asks for `max-height: 500px`, and anything 835px wide and under
-   500px tall is landscape by arithmetic, so no third case falls between them.
+   500px tall is landscape by arithmetic, so no third case fell between them.
    Written as a height floor rather than `not (...)`, which needs Safari 16.4
-   and buys nothing here. */
-@media (min-width: 835px) and (min-height: 501px) {
+   and buys nothing here.
+
+   K1 — and a height floor is what a software keyboard walks straight over.
+
+   The manifest is `display: standalone`, and a home-screen app shrinks its
+   *layout* viewport when the keyboard opens — so an 11" iPad in landscape goes
+   834 tall to about 481, and 481 is under the floor. The card behind the keyboard
+   stopped being an iPad and became a landscape phone: AVG/AB/H/R/RBI/BB gone to
+   `display: none`, the Player column frozen sticky, the strip and masthead
+   restyled, the grid's top edge up 39px. All of it back on dismiss. Same on a
+   9.7" iPad in landscape, 768 to 448.
+
+   So the two blocks are told apart by *width*, which no keyboard changes, and the
+   height floor is kept only where it is still the thing doing the work. A phone in
+   landscape is at most 956px wide (Pro Max); the narrowest iPad in landscape is
+   1024px. So `min-width: 1024px` admits every iPad at any height, the height floor
+   below it still keeps a 956px-wide phone out, and `max-width: 1023px` on the phone
+   block keeps the two exclusive at every size either can be — including the
+   keyboard-shrunk ones, which is the whole point.
+
+   Both predicates were evaluated across eight device sizes with and without a
+   keyboard: every resting layout is byte-for-byte the one it was, and the two
+   flips (11" and 9.7" iPad, landscape) are gone. */
+@media (min-width: 1024px), (min-width: 835px) and (min-height: 501px) {
   /* --- The strip: masthead, linescore and live readout on one deck --- */
   .deck-strip {
     position: sticky; top: 0; z-index: var(--z-deck);
@@ -2786,7 +2820,7 @@ details.info-details > summary:hover { background: rgba(255,255,255,0.16); borde
    and is later, so it already won here — but a rule that is right by ordering
    alone is one edit away from being wrong. */
 .header-bar { padding-top: calc(14px + var(--sa-t)); }
-@media (min-width: 835px) and (min-height: 501px) { .header-bar { padding-top: calc(8px + var(--sa-t)); } }
+@media (min-width: 1024px), (min-width: 835px) and (min-height: 501px) { .header-bar { padding-top: calc(8px + var(--sa-t)); } }
 
 /* The deck handle is phone-only. On an iPad the resting deck is 63-109px and
    folding it would buy a row and a half; at >=1100px there is already a fold,
@@ -2796,7 +2830,7 @@ details.info-details > summary:hover { background: rgba(255,255,255,0.16); borde
 
 /* ---------- Phone, both orientations ---------- */
 @media (max-width: 560px),
-       (orientation: landscape) and (max-height: 500px) and (min-width: 740px) {
+       (orientation: landscape) and (max-height: 500px) and (min-width: 740px) and (max-width: 1023px) {
 
   /* --- The grid --- */
   /* AVG / AB / H / R / RBI / BB are 145px and not one of them is written to
@@ -3139,7 +3173,7 @@ details.info-details > summary:hover { background: rgba(255,255,255,0.16); borde
 
 
 /* ---------- Phone, landscape ---------- */
-@media (orientation: landscape) and (max-height: 500px) and (min-width: 740px) {
+@media (orientation: landscape) and (max-height: 500px) and (min-width: 740px) and (max-width: 1023px) {
 
   /* --- What this block used to get for free (F28) ---------------------------
 

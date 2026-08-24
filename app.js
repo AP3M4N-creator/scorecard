@@ -11393,6 +11393,94 @@ document.addEventListener('focusin', function(e) {
   if (cell && cell !== selectedCell) selectCell(cell);
 });
 
+/* ------------------------------------------- K1 — a tap must not move the card ---
+
+   Focusing anything the browser thinks is out of view scrolls it into view, and the
+   card is a scroll container for most of its life: `--grid-max-h` caps `.grid-wrap`
+   whenever the fit gives up, which is every iPad at rest and every phone. Measured
+   with Show sub rows on — 400px of overflow, grid at the top — one `focus()` on the
+   ninth batter's name field took `scrollTop` from 0 to 400. The whole travel, on a
+   tap. Nothing in the app asked for it; it is the focusing steps doing it, which is
+   also why `preventScroll` on our own `focus()` calls would only cover the few taps
+   that route through script.
+
+   A tap does not need it. The scorer put a finger on a field they could already see,
+   so the field is in view by construction and scrolling it somewhere else is pure
+   loss. Restore what was there and the card stays still under the finger.
+
+   Tab does need it, and keeps it. A Magic Keyboard can move focus to a field that is
+   genuinely off the bottom of the box, and refusing to follow would leave the scorer
+   typing into something they cannot see — so the restore is gated on the focus having
+   started with a pointer. Anything else (Tab, the arrow-key path through the grid,
+   `focus()` from a hotkey) scrolls exactly as it did.
+
+   Restored three times, not once: synchronously, because the scroll has already
+   happened by the time this event fires; on the next frame, because the keyboard
+   opening prompts a second pass; and once more at 250ms for iOS, which adjusts again
+   when the keys finish animating in. The last is abandoned if the scorer has touched
+   the screen since — by then a scroll is theirs and must be left alone.
+
+   Note that a plain mouse click needs none of this: Chrome does not scroll a
+   partially visible field into view when a mouse focuses it, only when script or a
+   Tab does. It is script that does it here — several paths call `focus()` on the
+   field a tap selected — and on iOS it is the keyboard, which scrolls the field
+   clear of itself as it opens. Both arrive as a focus shortly after a pointer. */
+const POINTER_FOCUS_MS = 700;   // a tap's focus lands well inside this; Tab never does
+let _pointerAt = 0, _pointerScroll = null;
+
+/* Read at `pointerdown` and not in the `focusin` handler, which is the whole
+   subtlety here: the focusing steps scroll *before* they dispatch the event, so a
+   handler that reads `scrollTop` when it fires has already been handed the scrolled
+   number and restores the card to exactly where it did not want it. The position
+   worth keeping is the one under the finger when it landed.
+
+   Both the ancestors of what was touched and every `.grid-wrap`: a tap does not
+   always focus what it hit — SUB is a deck button and the field it opens is in a
+   sheet — and the card is the box that must not move either way. */
+function scrollStateAt(target) {
+  const boxes = [];
+  const add = (n) => {
+    if (!n || n.nodeType !== 1 || boxes.some(b => b.el === n)) return;
+    if (n.scrollHeight > n.clientHeight || n.scrollWidth > n.clientWidth) {
+      boxes.push({ el: n, top: n.scrollTop, left: n.scrollLeft });
+    }
+  };
+  for (let n = target; n; n = n.parentElement) add(n);
+  document.querySelectorAll('.grid-wrap').forEach(add);
+  return { boxes, x: window.scrollX, y: window.scrollY };
+}
+
+['pointerdown', 'mousedown', 'touchstart'].forEach(function(t) {
+  document.addEventListener(t, function(e) {
+    _pointerAt = Date.now();
+    _pointerScroll = scrollStateAt(e.target);
+  }, true);
+});
+
+/* A key ends the tap's claim on the scroll. Without this, a Tab pressed inside the
+   700ms window inherits the position the finger was at and the scroll-into-view it
+   is owed gets undone — the one case where suppressing a tap's scroll would reach
+   past the tap. Typing into the field just focused clears it too, which is right:
+   the focus has landed and been put back by then, and the delayed restores below
+   hold their own copy. */
+document.addEventListener('keydown', function() { _pointerScroll = null; }, true);
+
+document.addEventListener('focusin', function() {
+  if (!_pointerScroll || Date.now() - _pointerAt > POINTER_FOCUS_MS) return;
+  const at = _pointerAt, s = _pointerScroll;
+  const restore = () => {
+    s.boxes.forEach(b => {
+      if (b.el.scrollTop !== b.top) b.el.scrollTop = b.top;
+      if (b.el.scrollLeft !== b.left) b.el.scrollLeft = b.left;
+    });
+    if (window.scrollX !== s.x || window.scrollY !== s.y) window.scrollTo(s.x, s.y);
+  };
+
+  restore();
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(restore);
+  setTimeout(() => { if (_pointerAt === at) restore(); }, 250);
+});
+
 /* Init */
 function init() {
   // Field images set directly in HTML

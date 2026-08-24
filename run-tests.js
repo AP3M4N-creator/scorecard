@@ -306,7 +306,10 @@ function stylesheetChecks() {
       // Three blocks in this file share that media query, and only one of them
       // carries the strip — so take the one that actually sets the rule rather
       // than the first, which is a different block 1700 lines earlier.
-      const q = '@media (min-width: 835px) and (min-height: 501px)';
+      // Matched without the `@media` prefix: K1 put a `(min-width: 1024px)`
+      // alternative in front of the height-floor condition, so the query no
+      // longer starts where the block does.
+      const q = '(min-width: 835px) and (min-height: 501px)';
       let at = -1, i = -1;
       while ((i = css.indexOf(q, i + 1)) >= 0) {
         if (css.slice(i, i + 12000).includes('.linescore td {')) { at = i; break; }
@@ -563,6 +566,63 @@ function stylesheetChecks() {
       }
       return bare.length
         ? `a bare (min-width: 835px) at ${bare.join(', ')} — it matches a phone in landscape too (F28)`
+        : null;
+    });
+
+    /* K1. The height floor above keeps the two blocks disjoint, and a software
+       keyboard walks straight over it: a standalone home-screen app shrinks its
+       layout viewport, so an 11" iPad in landscape goes 834 tall to ~481 and the
+       card behind the keyboard becomes a landscape phone — six columns gone, the
+       Player column frozen, the grid's top edge up 39px, all of it back on
+       dismiss. Width is what no keyboard changes, so width is what has to tell
+       them apart. A phone in landscape is at most 956px wide; the narrowest iPad
+       in landscape is 1024px. */
+    check('the keyboard cannot flip an iPad into the phone-landscape layout', () => {
+      const ipad = /\(min-width:\s*1024px\)\s*,\s*\(min-width:\s*835px\)\s*and\s*\(min-height:\s*501px\)/g;
+      const floors = (css.match(/\(min-width:\s*835px\)\s*and\s*\(min-height:\s*501px\)/g) || []).length;
+      const alts = (css.match(ipad) || []).length;
+      if (alts !== floors) {
+        return `${floors} height-floor iPad conditions but only ${alts} carry the (min-width: 1024px) alternative — the ones without it hand the card to the phone-landscape block the moment a keyboard opens (K1)`;
+      }
+      const landscape = [];
+      const re = /\(orientation:\s*landscape\)\s*and\s*\(max-height:\s*500px\)\s*and\s*\(min-width:\s*740px\)(\s*and\s*\(max-width:\s*1023px\))?/g;
+      let m;
+      while ((m = re.exec(css))) {
+        if (!m[1]) landscape.push('line ' + (css.slice(0, m.index).split('\n').length));
+      }
+      if (landscape.length) {
+        return `a phone-landscape condition without its (max-width: 1023px) ceiling at ${landscape.join(', ')} — a keyboard-shrunk iPad matches it (K1)`;
+      }
+      // ui.js asks matchMedia the same question and must ask it the same way, or
+      // the layout reserves space for one deck and paints another.
+      return /\(orientation: landscape\) and \(max-height: 500px\) and \(min-width: 740px\) and \(max-width: 1023px\)/
+        .test(read('ui.js'))
+        ? null
+        : "ui.js's PHONE_LANDSCAPE is out of step with the stylesheet's ceiling (K1)";
+    });
+
+    /* K1. `fit()` budgets against `window.innerHeight`, which the keyboard changes
+       in a standalone app — so it has to hold while a field has focus, and the
+       docked deck has to be told how far the layout viewport moved under it or it
+       rides up on its own (378px on a 13" iPad, measured). */
+    check('the card holds still while the keyboard is up', () => {
+      // Comments stripped first: the note explaining why the per-keystroke refit
+      // went quotes the line it removed, and a bare grep reads its own epitaph.
+      const ui = read('ui.js').replace(/\/\*[\s\S]*?\*\//g, '');
+      if (/addEventListener\(\s*'input'\s*,\s*refit\s*\)/.test(ui)) {
+        return 'ui.js still refits per keystroke — every character re-measures the card, against a viewport the keyboard has shrunk (K1)';
+      }
+      if (!/function typing\(\)/.test(ui) || !/if \(typing\(\) && window\.innerWidth === restW\)/.test(ui)) {
+        return 'fit() no longer holds its height budget while a field has focus (K1)';
+      }
+      if (!/addEventListener\(\s*'focusout'\s*,\s*refit\s*\)/.test(ui)) {
+        return 'nothing refits when the keyboard closes, so the card stays at its pre-keyboard size for good (K1)';
+      }
+      const docked = (css.match(/position:\s*fixed;\s*left:\s*0;\s*right:\s*0;\s*bottom:[^;]*;\s*z-index:\s*var\(--z-deck-docked\)/g) || []);
+      if (!docked.length) return 'the docked-deck rules no longer read as expected — check the --kb-shift anchor by hand (K1)';
+      const unpinned = docked.filter(d => !d.includes('--kb-shift'));
+      return unpinned.length
+        ? `${unpinned.length} of ${docked.length} docked-deck rules pin bottom: 0 — the deck rides up by the keyboard's whole height while the card holds still (K1)`
         : null;
     });
 
