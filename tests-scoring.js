@@ -7325,6 +7325,33 @@
     eq('three words', parseLineupText('12 De La Cruz SS .310').rows[0].name, 'De La Cruz');
   });
 
+  test('an initial with its dot is a name, not a position', () => {
+    // "C." and "P." are the two initials that collide with a position. The dot
+    // is what tells them apart, so the dot decides.
+    const c = four(parseLineupText('C. Anderson').rows[0]);
+    eq('the catcher is not claimed', JSON.stringify(c),
+      JSON.stringify({ num: '', name: 'C. Anderson', pos: '', avg: '' }));
+    eq('nor the pitcher', JSON.stringify(four(parseLineupText('P. Jones').rows[0])),
+      JSON.stringify({ num: '', name: 'P. Jones', pos: '', avg: '' }));
+    eq('and the line still reads whole',
+      JSON.stringify(four(parseLineupText('12 C. Anderson SS .310').rows[0])),
+      JSON.stringify({ num: '12', name: 'C. Anderson', pos: 'SS', avg: '.310' }));
+  });
+
+  test('a position written out beats a single letter that could be an initial', () => {
+    // No dot, so "C" is a position — until the line spells one out, and then
+    // the letter was the batter's initial all along.
+    eq('alone it is the catcher', parseLineupText('C Anderson').rows[0].pos, 'C');
+    const row = parseLineupText('C Anderson SS').rows[0];
+    eq('with a position on the line it is not', row.pos, 'SS');
+    eq('and the letter goes back to the name', row.name, 'C Anderson');
+  });
+
+  test('a spelled-out position still tolerates its trailing dot', () => {
+    eq('the dot is dropped where it is punctuation',
+      parseLineupText('Ramirez SS.').rows[0].pos, 'SS');
+  });
+
   test('a leading batting-order marker is not read as a jersey', () => {
     eq('a dot', parseLineupText('1. 12 Ramirez SS').rows[0].num, '12');
     eq('a bracket', parseLineupText('1) 12 Ramirez SS').rows[0].num, '12');

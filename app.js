@@ -684,9 +684,18 @@ const LINEUP_AVG_RE = /^(?:\.\d{1,3}|0\.\d{1,3}|1\.000)$/;
 const LINEUP_NUM_RE = /^#?(\d{1,3})\.?$/;
 
 /* A position, or null if the token is not one. Returns `{pos, warn}` so the
-   uncarded names above can report themselves rather than reading as a name. */
+   uncarded names above can report themselves rather than reading as a name.
+
+   The trailing dot is stripped so "SS." reads, but only off a token that still
+   has something to it afterwards: "C." and "P." are an initial, never the
+   catcher and never the pitcher. That dot is the one thing that tells
+   "C. Anderson" from "C Anderson", so it is the one thing this must not
+   discard. A bare "C" stays a position — that is how a lineup is written — and
+   `classifyLineupParts` gives it back to the name when the line turns out to
+   carry a spelled-out position of its own. */
 function posFromToken(tok) {
-  const t = String(tok || '').trim().toUpperCase().replace(/\.$/, '').replace(/\s+/g, ' ');
+  const raw = String(tok || '').trim().toUpperCase().replace(/\s+/g, ' ');
+  const t = raw.length > 2 ? raw.replace(/\.$/, '') : raw;
   if (!t) return null;
   if (LINEUP_POS.indexOf(t) !== -1) return { pos: t, warn: '' };
   const key = Object.prototype.hasOwnProperty.call(LINEUP_POS_ALIAS, t) ? t
@@ -767,6 +776,17 @@ function classifyLineupParts(parts, mode, posColHint) {
     if (tok) tokens.push({ tok: tok, field: i });
   }));
 
+  /* A lone "C" or "P" is the one token that is a position and an initial at
+     once. It reads as the position — a lineup is written that way — unless the
+     line spells a position out somewhere else, in which case the single letter
+     was the batter's initial all along and belongs to the name. Worked out up
+     front because the deciding token may come after it: "C Anderson SS". */
+  const spelledPos = tokens.some(({ tok }) => {
+    if (LINEUP_NUM_RE.test(tok)) return false;
+    const hit = posFromToken(tok);
+    return !!(hit && hit.pos && tok.replace(/\.$/, '').length > 1);
+  });
+
   const nameBits = {};
   tokens.forEach(({ tok, field }) => {
     const bare = tok.replace(/^#/, '').replace(/\.$/, '');
@@ -781,7 +801,7 @@ function classifyLineupParts(parts, mode, posColHint) {
 
     // A position, if the token is a word. Bare digits fall through to the
     // jersey and get a second look there.
-    if (!row.pos && !isBareInt) {
+    if (!row.pos && !isBareInt && !(spelledPos && tok.length === 1)) {
       const hit = posFromToken(tok);
       if (hit) {
         row.pos = hit.pos;
