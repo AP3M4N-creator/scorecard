@@ -103,14 +103,23 @@
           <!-- A device preference, not a card rule, which is why it is here
                and not in Details beside regulation innings and re-entry (I1).
 
-               A toggle button with `aria-pressed`, not `role="menuitemcheckbox"`:
-               that role is only meaningful inside a `role="menu"`, and giving
-               this panel one would promise arrow-key navigation and a roving
-               tabindex that it does not implement. A pressed button is valid
-               standing on its own, and it is what the popup chips already use.
-               `applyScoringMode` is the only thing that writes it. -->
-          <button id="mode-toggle" class="menu-check" aria-pressed="false"
-                  data-act="toggleBeginnerMode">Beginner mode</button>
+               Three mutually exclusive toggle buttons, not a <select>: the
+               panel already speaks toggle-button (see Guide/Summary above),
+               `aria-pressed` puts every option straight in the accessibility
+               tree instead of behind a collapsed picker value, and each one
+               is `role="menuitemcheckbox"`-free for the same reason the old
+               single toggle was — this panel is not `role="menu"` and does
+               not implement the roving tabindex that role would promise.
+               `applyScoringMode` is the only thing that writes any of the
+               three. Simple is play-by-play rather than pitch-by-pitch: it
+               keeps Expert's own deck, it just hides the pitch-track keys. -->
+          <div class="hdr-menu-label">Scoring style</div>
+          <button id="mode-expert" class="menu-check" aria-pressed="true"
+                  data-act="setScoringMode" data-arg="expert">Expert</button>
+          <button id="mode-beginner" class="menu-check" aria-pressed="false"
+                  data-act="setScoringMode" data-arg="beginner">Beginner</button>
+          <button id="mode-simple" class="menu-check" aria-pressed="false"
+                  data-act="setScoringMode" data-arg="simple">Simple (no pitch tracking)</button>
           <button class="danger" data-act="newGame">New Game</button>
         </div>
       </div>
@@ -178,7 +187,7 @@
           <button class="quick-btn" data-word="strike" data-act="addPitch" data-arg="S" style="color:var(--accent)">S<small>s</small></button>
           <button class="quick-btn" data-word="foul" data-act="addPitch" data-arg="F">F<small>f</small></button>
           <button class="quick-btn" data-word="ball" data-act="addPitch" data-arg="B" style="color:var(--navy)">B<small>b</small></button>
-          <span class="qb-sep"></span>
+          <span class="qb-sep qb-sep-pitch"></span>
           <button class="quick-btn hit" data-word="single" data-act="applyPlay" data-arg="1B">1B<small>1</small></button>
           <button class="quick-btn hit" data-word="double" data-act="applyPlay" data-arg="2B">2B<small>2</small></button>
           <button class="quick-btn hit" data-word="triple" data-act="applyPlay" data-arg="3B">3B<small>3</small></button>
@@ -335,7 +344,7 @@
           <button class="quick-btn" data-word="strike" data-act="addPitch" data-arg="S" style="color:var(--accent)">S<small>s</small></button>
           <button class="quick-btn" data-word="foul" data-act="addPitch" data-arg="F">F<small>f</small></button>
           <button class="quick-btn" data-word="ball" data-act="addPitch" data-arg="B" style="color:var(--navy)">B<small>b</small></button>
-          <span class="qb-sep"></span>
+          <span class="qb-sep qb-sep-pitch"></span>
           <button class="quick-btn hit" data-word="single" data-act="applyPlay" data-arg="1B">1B<small>1</small></button>
           <button class="quick-btn hit" data-word="double" data-act="applyPlay" data-arg="2B">2B<small>2</small></button>
           <button class="quick-btn hit" data-word="triple" data-act="applyPlay" data-arg="3B">3B<small>3</small></button>

@@ -663,6 +663,18 @@ details.info-details > summary:hover { color: var(--navy); }
   content: 'optional';
   font-size: 8px; letter-spacing: .04em; font-weight: 600; opacity: .8;
 }
+
+/* Simple mode (play-by-play) skips the "optional" label and removes the
+   pitch keys outright — that is the entire mode, so it earns its own rule
+   rather than reusing Beginner's. `qb-sep-pitch` is the one separator that
+   sits between the pitch keys and the outcome keys; without hiding it too,
+   the deck would open on a bare divider. Nothing else in the deck changes:
+   Simple is Expert's own outcome keys, unworded and ungated, minus this row. */
+[data-mode="simple"] .qb-label-pitch,
+[data-mode="simple"] .quick-btn[data-act="addPitch"],
+[data-mode="simple"] .qb-sep-pitch {
+  display: none;
+}
 .qb-more-btn {
   margin-left: auto; padding: 8px 14px; min-height: 40px; cursor: pointer;
   font-family: var(--heading); font-size: 13px; font-weight: 600; letter-spacing: .04em;
@@ -2538,6 +2550,14 @@ details.info-details > summary:hover { background: rgba(255,255,255,0.16); borde
 }
 .hdr-menu-panel button.menu-check[aria-pressed="true"]::after { visibility: visible; }
 .hdr-menu-panel button.menu-check[aria-pressed="true"] { background: var(--blue-light); }
+
+/* Groups the three scoring-style buttons under one word rather than making
+   each button's own label carry the context ("Scoring style: Expert"). Not a
+   button, so it never picks up `.hdr-menu-panel button` rules. */
+.hdr-menu-label {
+  padding: 8px 12px 2px; font-family: var(--heading); font-size: 10px; font-weight: 700;
+  letter-spacing: .1em; text-transform: uppercase; color: var(--text-light);
+}
 
 /* The team switch lives in the section bar now — one control row
    instead of two. Only the active tab's copy is ever on screen. */

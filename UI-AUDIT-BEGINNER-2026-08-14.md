@@ -57,7 +57,7 @@ the right register.
 Three things are wrong with it, none of them the writing:
 
 - It is **titled for a keyboard**, on an app whose primary device is an iPad with no keyboard.
-  Six of its eight sections are irrelevant to a beginner, and `app.js:11191` concedes the modal
+  Six of its eight sections are irrelevant to a beginner, and `app.js:11207` concedes the modal
   "is the only documentation the app has."
 - It is **incomplete in the opposite direction**: the codes a beginner meets *first* — the ones
   on the always-visible core row — are the ones the glossary section omits, because they have
@@ -71,7 +71,7 @@ Three things are wrong with it, none of them the writing:
 | Row | Says | Actually |
 |---|---|---|
 | `index.html:534` | Foul is a **"Black ✕"** | Renders navy — `rgba(0,50,120,0.88)`, `styles.css:965` |
-| `index.html:567` | WP/PB — **"All runners advance 1"** | Opens a popup asking *who moved* unless exactly one runner is on (`applyRunnerEvent`, `app.js:5863`) |
+| `index.html:567` | WP/PB — **"All runners advance 1"** | Opens a popup asking *who moved* unless exactly one runner is on (`applyRunnerEvent`, `app.js:5879`) |
 
 The "Red ✕" for a strike is fair — `#8f0c14` (`styles.css:2275`) is a dark red. The foul row is
 simply wrong, and the WP/PB row teaches a beginner a rule the app itself doesn't follow.
@@ -96,20 +96,20 @@ happened to each runner.* Every one of those pieces already exists as a step in 
 the entry point demands you know `GO` before you can describe a ground ball.
 
 **B5 — Fielder numbers are taught in the worst possible layout.**
-`showPositionPopup` (`app.js:7492`) was a 3×3 numeric grid, `1 P` … `9 RF`, laid out in
+`showPositionPopup` (`app.js:7508`) was a 3×3 numeric grid, `1 P` … `9 RF`, laid out in
 reading order — which is not where those players stand. Fielder numbering is the single most
 important thing a new scorer must internalize, it is inherently spatial, and it was presented as
 a phone dialpad. *Fixed at step 2: the grid is now the positioned field map, whose geometry is
-the single table `FIELD_MAP` (`app.js:7365`) and whose markup both mounts share through
-`fieldMapMarkup` (`app.js:7475`).*
+the single table `FIELD_MAP` (`app.js:7381`) and whose markup both mounts share through
+`fieldMapMarkup` (`app.js:7491`).*
 
 **B6 — Success is silent.**
-After entry the cell shows `6-3` and nothing more. `showPlayToast` (`app.js:2539`) fires only for
+After entry the cell shows `6-3` and nothing more. `showPlayToast` (`app.js:2555`) fires only for
 refusals and caveats. A beginner has no way to tell whether the app understood them.
 
-The renderer for this already exists: `describeCellForScreenReader` (`app.js:1364`) produces
+The renderer for this already exists: `describeCellForScreenReader` (`app.js:1380`) produces
 *"Visiting, batting order 3, inning 5: 2B, 1 RBI, scored"* for the screen-reader live region, and
-`updateCellAria` (`app.js:1482`) keeps it in sync from every paint path so it cannot drift. It is
+`updateCellAria` (`app.js:1498`) keeps it in sync from every paint path so it cannot drift. It is
 one adaptation away from being the beginner's feedback loop.
 
 **B7 — Nothing is ever context-disabled.**
@@ -122,18 +122,18 @@ The messages are already centralized and well-written (`NO_CELL`, `INNING_OVER`,
 after the tap instead of as instruction before it.
 
 **B8 — The best "as it happened" surface doesn't say what it's resolving.**
-`showRunnerPopup` (`app.js:4220`) is genuinely good design: it walks each runner by name, offers
+`showRunnerPopup` (`app.js:4236`) is genuinely good design: it walks each runner by name, offers
 `Hold / 2nd / 3rd / Home` and `Out at…`, and carries a separate `on E` tick because *which* base
 he took and *why* are two questions. But it titles itself the generic **"Advance Runners"** for
 every hit and every error; only WP and PB passed a specific title, through `RUNNER_EVENT_TITLE`.
 The scorer is answering a question without being told which play they're answering it for.
-*Fixed at step 0.3: the table `PLAY_TITLE` (`app.js:2253`) and its reader `playTitle`
-(`app.js:2265`) name the play, and the popup titles itself "Single — Who Moved" in
-`RUNNER_EVENT_TITLE`'s register (`app.js:5845`).*
+*Fixed at step 0.3: the table `PLAY_TITLE` (`app.js:2269`) and its reader `playTitle`
+(`app.js:2281`) name the play, and the popup titles itself "Single — Who Moved" in
+`RUNNER_EVENT_TITLE`'s register (`app.js:5861`).*
 
 **B9 — Two runner surfaces, two vocabularies.**
 `showRunnerPopup` said `Hold / 2nd / 3rd / Home / Out 2nd`. The DP/FC/TP outcome popup, whose
-chips are built by `ocChip` (`app.js:3561`), says `Hold 1st / Safe 2nd / Out at 2nd`. Same
+chips are built by `ocChip` (`app.js:3577`), says `Hold 1st / Safe 2nd / Out at 2nd`. Same
 question, two dialects — and the *visual* version of this problem had already been noticed and
 fixed, with the wording left behind. *Fixed at step 0.3, the explicit dialect winning: the
 advancement popup adopted `Hold 1st / Safe 2nd / Out at 2nd` and took the height cost.*
@@ -162,7 +162,7 @@ optional, and the count lives up in the linescore strip, far from the buttons pr
   measured target table (`styles.css:1856`) covering the deck, lineup and linescore. It did
   not cover the popups, which ran 13–25px tall: `font-size:9px;padding:1px 5px` on the pitching-
   decision "change" button (≈13px), `padding:3px 8px;font-size:10px` on every runner-outcome
-  button (≈19px), `padding:2px 7px` on "↻ Fix Stats" (`app.js:1121`, ≈18px). These are controls
+  button (≈19px), `padding:2px 7px` on "↻ Fix Stats" (`app.js:1137`, ≈18px). These are controls
   a scorer uses mid-play. *Fixed at step 3: the popups are on the 40px standard and are in the
   target table now — the second half of it, under "The popups app.js builds (I11)".*
 - **H3 — The sub-row placeholder is effectively invisible.** `styles.css:860` paints the "PH /
@@ -172,7 +172,7 @@ optional, and the count lives up in the linescore strip, far from the buttons pr
 - **H4 — Popup selected state is colour-only**, with no `aria-pressed`. *Fixed at step 3: an
   inset ring and 700 weight carry it through greyscale, and `aria-pressed` is on every chip.*
 - **H5 — No keyboard entry into the grid.** No `tabindex` on `.at-bat-cell`, and arrow
-  navigation bails early without a prior tap (`app.js:10971`).
+  navigation bails early without a prior tap (`app.js:10987`).
 
 ---
 
@@ -217,15 +217,15 @@ one — `F8`, `L7` and `P2` are three codes, and writing a catcher's pop-up as `
 notation in a feature whose whole purpose is teaching notation.
 
 **I3 · Field-map fielder picker.**
-Replace the 3×3 keypad's *layout* (`app.js:7492`) with a positioned diamond-and-outfield
+Replace the 3×3 keypad's *layout* (`app.js:7508`) with a positioned diamond-and-outfield
 SVG: 6 between second and third, 8 in dead center, 3 by the first-base bag. Keep the numbers,
 keep `posPadTap`, keep "Type it" as the escape hatch for a fast scorer. Follows the existing
-inline-SVG pattern (`diamondSVG` `app.js:487`; the scoreboard mini-diamond `index.html:157`).
+inline-SVG pattern (`diamondSVG` `app.js:503`; the scoreboard mini-diamond `index.html:157`).
 
 Worth offering in **both** modes — an expert taps a spatial target faster than they read a grid.
 
 **I4 · Plain-English echo after every play.**
-Cheapest item here per unit of value, because `describeCellForScreenReader` (`app.js:1364`)
+Cheapest item here per unit of value, because `describeCellForScreenReader` (`app.js:1380`)
 already does most of it. Extend it from *"2B, 1 RBI, scored"* toward *"Doubled to left field.
 Ramirez scored from second. 1 out."* Then:
 

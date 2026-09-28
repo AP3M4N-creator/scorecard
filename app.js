@@ -49,50 +49,66 @@ function reportStorageFailure() {
    The state is mirrored onto `<html data-mode>` so the stylesheet can gate a
    purely visual surface without asking JS, and set during `loadState` — before
    the card is painted — so nothing flashes through the wrong mode on the way
-   up. `beginnerMode()` is the only reader; nothing else should test the
-   attribute or the key directly. */
+   up. `beginnerMode()` / `simpleMode()` are the only readers; nothing else
+   should test the attribute or the key directly. */
 const MODE_KEY = 'baseball-scorecard-mode';
 const MODE_BEGINNER = 'beginner';
+const MODE_SIMPLE = 'simple';
 const MODE_EXPERT = 'expert';
 
-// Anything that is not exactly 'beginner' is Expert, which is the safe way
-// round: a corrupt or half-written value lands on today's app rather than on
-// a mode the scorer never asked for.
+// Anything that is not exactly 'beginner' or 'simple' is Expert, which is the
+// safe way round: a corrupt or half-written value lands on today's app rather
+// than on a mode the scorer never asked for.
 function scoringMode() {
-  return safeStorage.getItem(MODE_KEY) === MODE_BEGINNER ? MODE_BEGINNER : MODE_EXPERT;
+  const v = safeStorage.getItem(MODE_KEY);
+  return (v === MODE_BEGINNER || v === MODE_SIMPLE) ? v : MODE_EXPERT;
 }
 
 function beginnerMode() { return scoringMode() === MODE_BEGINNER; }
 
-/* Write the mode onto the document, and onto the menu item that reports it.
-   Called on boot and on every flip, so the attribute, the tick and the stored
-   value cannot come apart. */
+/* Simple mode: play-by-play rather than pitch-by-pitch. It keeps every
+   outcome key Expert has — unlike Beginner, it does not route plays through
+   the guided walkthrough or reword the deck — and hides only the pitch-track
+   keys (S/F/B), which `applyPlay` never required in the first place: it has
+   always synthesised a legal pitch sequence for whatever outcome lands, so a
+   scorer who never taps a pitch still gets a real pitch count and B-S split
+   in the pitcher box score. Simple just stops asking for something optional. */
+function simpleMode() { return scoringMode() === MODE_SIMPLE; }
+
+const MODE_NOTICE = {
+  expert: 'Expert mode — plays are recorded without commentary.',
+  beginner: 'Beginner mode on — the card will explain what it records.',
+  simple: 'Simple mode — pitch tracking is hidden. Tap the play that happened.'
+};
+
+/* Write the mode onto the document, and onto whichever menu item reports it.
+   Called on boot and on every switch, so the attribute, the ticks and the
+   stored value cannot come apart. Three buttons rather than one boolean
+   toggle, so it walks all of them rather than assuming an id. */
 function applyScoringMode() {
   if (typeof document === 'undefined') return;
-  const on = beginnerMode();
+  const mode = scoringMode();
   const root = document.documentElement;
-  if (root) root.setAttribute('data-mode', on ? MODE_BEGINNER : MODE_EXPERT);
-  const item = document.getElementById('mode-toggle');
-  if (item) {
-    // A pressed toggle button — see the markup for why not a checkbox role.
-    item.setAttribute('aria-pressed', on ? 'true' : 'false');
-  }
+  if (root) root.setAttribute('data-mode', mode);
+  document.querySelectorAll('[data-act="setScoringMode"]').forEach(function(btn) {
+    // A pressed toggle button — see the markup for why not a radio role.
+    btn.setAttribute('aria-pressed', btn.dataset.arg === mode ? 'true' : 'false');
+  });
 }
 
-function toggleBeginnerMode() {
-  const on = !beginnerMode();
-  safeStorage.setItem(MODE_KEY, on ? MODE_BEGINNER : MODE_EXPERT);
+function setScoringMode(mode) {
+  const value = (mode === MODE_BEGINNER || mode === MODE_SIMPLE) ? mode : MODE_EXPERT;
+  if (value === scoringMode()) return;   // already there — no toast, no churn
+  safeStorage.setItem(MODE_KEY, value);
   applyScoringMode();
   // The dimming is a stylesheet rule on `aria-disabled`, and the pass that
-  // writes it runs on state changes — of which flipping a mode is not one. A
+  // writes it runs on state changes — of which switching mode is not one. A
   // scorer who turns Beginner on between plays would otherwise see an
   // undimmed deck until the next entry (I5).
   if (typeof refreshControlAvailability === 'function') refreshControlAvailability();
   // Said in words, because the tick is inside a menu that is about to close
   // over it — and on the phone the menu covers the corner it sits in.
-  showPlayNotice(on
-    ? 'Beginner mode on — the card will explain what it records.'
-    : 'Expert mode — plays are recorded without commentary.');
+  showPlayNotice(MODE_NOTICE[value]);
 }
 
 /* ------------------------------------------------ unreadable saves (#25) ---

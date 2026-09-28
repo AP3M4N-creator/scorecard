@@ -267,6 +267,8 @@
   function sel(team, p, col) { touch(col); selectCell(cellOf(team, p, col)); return cellOf(team, p, col); }
   // Put this case in Beginner mode. `reset()` puts it back to Expert after.
   function beginner() { safeStorage.setItem(MODE_KEY, MODE_BEGINNER); applyScoringMode(); }
+  // Same, for Simple mode.
+  function simple() { safeStorage.setItem(MODE_KEY, MODE_SIMPLE); applyScoringMode(); }
   function play(code) { touch(curCol()); applyPlay(code); }
   function pitch(type) { touch(curCol()); addPitch(type); }
   function key(k) {
@@ -8509,23 +8511,24 @@
     box.remove();
   });
 
-  /* ---- I1: Beginner / Expert ----------------------------------------------
+  /* ---- I1 / Simple: Beginner / Expert / Simple -----------------------------
 
-     The container the rest of the beginner work hangs off, so what these pin is
-     the contract the later steps are going to rely on rather than any one
-     surface. Three things, and each of them is a way this could go wrong
+     The container the rest of the beginner (and later, simple) work hangs off,
+     so what these pin is the contract the later steps rely on rather than any
+     one surface. Three things, and each of them is a way this could go wrong
      quietly:
 
        - **Expert is the default and Expert is today's app.** A device nobody
          has touched must behave exactly as it did before I1. If that ever stops
-         being true, every Beginner surface built after this becomes a change to
-         everyone's app rather than an opt-in.
+         being true, every Beginner or Simple surface built after this becomes a
+         change to everyone's app rather than an opt-in.
        - **It is a device preference, not a card rule.** It must survive New
          Game and a load from the library, and it must never appear in
          `gameState` — where it would ride along into an export and arrive on
          somebody else's iPad.
-       - **The tick, the attribute and the stored value are one state.** Three
-         representations that can drift; `applyScoringMode` is the only writer.
+       - **The ticks, the attribute and the stored value are one state.** Four
+         representations that can drift (one stored value, one attribute, three
+         buttons' ticks); `applyScoringMode` is the only writer.
 
      The stylesheet is not loaded under jsdom, so nothing here can see the tick
      itself — what it can see is `aria-pressed`, which is what actually carries
@@ -8535,35 +8538,64 @@
     eq('the stored value is absent, not a mode', safeStorage.getItem(MODE_KEY), null);
     eq('and it reads as Expert', scoringMode(), 'expert');
     ok('which is what the rest of the app asks', !beginnerMode());
+    ok('Simple agrees', !simpleMode());
     eq('the document says so too',
       document.documentElement.getAttribute('data-mode'), 'expert');
-    eq('and the menu item reports unchecked',
-      document.getElementById('mode-toggle').getAttribute('aria-pressed'), 'false');
+    eq('Expert reports pressed',
+      document.getElementById('mode-expert').getAttribute('aria-pressed'), 'true');
+    eq('Beginner does not',
+      document.getElementById('mode-beginner').getAttribute('aria-pressed'), 'false');
+    eq('nor Simple',
+      document.getElementById('mode-simple').getAttribute('aria-pressed'), 'false');
   });
 
-  test('the toggle flips all three representations together', () => {
-    toggleBeginnerMode();
+  test('switching mode flips every representation together, for all three', () => {
+    setScoringMode('beginner');
     ok('the app is in Beginner', beginnerMode());
+    ok('and not Simple', !simpleMode());
     eq('the value is stored', safeStorage.getItem(MODE_KEY), MODE_BEGINNER);
     eq('the document carries it', document.documentElement.getAttribute('data-mode'), 'beginner');
-    eq('the menu item is checked',
-      document.getElementById('mode-toggle').getAttribute('aria-pressed'), 'true');
+    eq('Beginner is pressed',
+      document.getElementById('mode-beginner').getAttribute('aria-pressed'), 'true');
+    eq('Expert is not',
+      document.getElementById('mode-expert').getAttribute('aria-pressed'), 'false');
+    eq('nor Simple',
+      document.getElementById('mode-simple').getAttribute('aria-pressed'), 'false');
     ok('and it says which way it went', /Beginner mode on/.test(toastText()));
 
-    toggleBeginnerMode();
-    ok('and back', !beginnerMode());
+    setScoringMode('simple');
+    ok('now Simple', simpleMode());
+    ok('and not Beginner', !beginnerMode());
+    eq('the value is stored', safeStorage.getItem(MODE_KEY), MODE_SIMPLE);
+    eq('the document carries it', document.documentElement.getAttribute('data-mode'), 'simple');
+    eq('Simple is pressed',
+      document.getElementById('mode-simple').getAttribute('aria-pressed'), 'true');
+    eq('Beginner is not',
+      document.getElementById('mode-beginner').getAttribute('aria-pressed'), 'false');
+    ok('and it says which way it went', /Simple mode/.test(toastText()));
+
+    setScoringMode('expert');
+    ok('back to Expert', !beginnerMode() && !simpleMode());
     eq('stored as expert rather than removed', safeStorage.getItem(MODE_KEY), MODE_EXPERT);
     eq('document', document.documentElement.getAttribute('data-mode'), 'expert');
-    eq('menu item', document.getElementById('mode-toggle').getAttribute('aria-pressed'), 'false');
+    eq('menu', document.getElementById('mode-expert').getAttribute('aria-pressed'), 'true');
   });
 
-  // Anything that is not exactly 'beginner' is Expert. A half-written value is
-  // the case this exists for: it must land on today's app, not on a mode the
-  // scorer never chose.
+  // Clicking the mode you are already in is a no-op, not a re-announcement —
+  // the toast would otherwise fire every time the menu is opened and closed
+  // on the active option.
+  test('setting the mode you are already in does nothing', () => {
+    setScoringMode('expert');
+    eq('no toast for the no-op', toastText(), '');
+  });
+
+  // Anything that is not exactly 'beginner' or 'simple' is Expert. A
+  // half-written value is the case this exists for: it must land on today's
+  // app, not on a mode the scorer never chose.
   test('a value the app did not write reads as Expert', () => {
-    ['', 'BEGINNER', 'Beginner ', 'true', '1', 'null'].forEach(v => {
+    ['', 'BEGINNER', 'Beginner ', 'SIMPLE', 'true', '1', 'null'].forEach(v => {
       safeStorage.setItem(MODE_KEY, v);
-      eq(`${JSON.stringify(v)} is not Beginner`, scoringMode(), 'expert');
+      eq(`${JSON.stringify(v)} is not Beginner or Simple`, scoringMode(), 'expert');
     });
   });
 
