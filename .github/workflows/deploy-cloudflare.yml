@@ -24,7 +24,11 @@ permissions:
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest
+    # Pinned rather than ubuntu-latest: that label migrates to Ubuntu 26
+    # from 2026-10-19, and the image moving under a deploy is the kind of
+    # change that is only noticed as a failed publish. Bump it on purpose,
+    # having watched a run go green, rather than on GitHub's schedule.
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
 
