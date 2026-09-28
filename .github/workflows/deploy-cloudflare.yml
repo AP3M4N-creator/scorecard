@@ -1,0 +1,48 @@
+# Publish the card to Cloudflare Pages on every push to main.
+#
+# GitHub Pages deploys itself from the repo root; this is the other half, for
+# the Cloudflare copy, which is a Direct Upload project and so is not something
+# Cloudflare watches a branch for. The actual publishing is deploy-cloudflare.sh
+# -- the same script run by hand with `npm run deploy` -- so there is one
+# definition of what ships and CI cannot drift from the Mac.
+name: Deploy to Cloudflare Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# A second push while the first is still deploying would race it to the same
+# project. Queue instead of cancelling: a cancelled run leaves whichever
+# deployment got there first live, which may be the older commit.
+concurrency:
+  group: cloudflare-pages
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      # The pre-commit hook runs these on Adam's machines, but a hook is local
+      # config -- it does not travel with a clone and it can be skipped. This is
+      # the gate that actually holds: a red suite must not reach the iPad.
+      - name: Run the suite
+        run: npm test
+
+      - name: Deploy
+        run: ./deploy-cloudflare.sh
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
